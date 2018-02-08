@@ -9,29 +9,30 @@ import os
 import pandas as pd
 
 
+def svm_labels(label):
+    return 1 if label == 1 else 0
+
 def dist_from_hyplane(x, w, b):
-    return (np.dot(w, x) - b)/np.linalg.norm(w)
+    return (np.dot(w, x) + b)/np.linalg.norm(w)
 
 
 def generate_labeled_points(n, dim):
 
     norm = np.random.uniform(low=0, high=1, size=dim)
     intercept = np.random.uniform(low=0, high=1)
-    gamma = np.random.uniform(low=0, high=1)
+    gammas = []
 
     points = []
-    count = 0
-    while count < n:
+    for i in range(n):
         point = np.random.uniform(low=0, high=1, size=dim)
 
         dist = dist_from_hyplane(point, norm, intercept)
         # Throw out point in inside margin
-        if abs(dist) >= gamma:
-            gamma = min(gamma, dist)
-            label = 1 if dist >= 0 else 0
-            points.append(LabeledPoint(label,point))
-            count += 1
+        gammas.append(abs(dist))
+        label = 1 if dist > 0 else -1
+        points.append(LabeledPoint(label,point))
 
+    gamma = min(gammas)
     return points, gamma
 
 
@@ -67,19 +68,25 @@ def simulation(test_range, step_size, file, runs=100, dim=2):
             points, gamma = generate_labeled_points(n, dim)
             train_dat, test_dat = train_test_split(np.array(points), test_size=.2)
 
+            svm_train_dat = np.array([LabeledPoint(svm_labels(x.label),x.features) for x in train_dat])
+            print(train_dat)
+            print(svm_train_dat)
             test_points = [x.features.toArray() for x in test_dat]
             test_labels = [x.label for x in test_dat]
+            svm_test_labels = [svm_labels(x.label) for x in test_dat]
+            print(test_labels)
+            print(svm_test_labels)
 
             perceptron = Perceptron(dim)
             perceptron.train(train_dat)
             predictions = perceptron.predict(test_points)
             p_error = test_error(predictions, test_labels)
 
-            svm = SVMWithSGD.train(sc.parallelize(train_dat))
+            svm = SVMWithSGD.train(sc.parallelize(train_dat), regType=None)
             predictions = svm.predict(sc.parallelize(test_points))
             svm_error = test_error(predictions.collect(), test_labels)
 
-            data.append([n, gamma, perceptron.weights, p_error, svm.weights, svm_error])
+            data.append([n, gamma, perceptron.weights, p_error, svm.weights.toArray(), svm_error])
             print(data[i])
         n += step_size
 
@@ -118,5 +125,5 @@ if __name__ == "__main__":
     sc.setLogLevel(logLevel="OFF")
     spark = SparkSession(sparkContext=sc)
 
-    df = simulation((10,100),10, file=None)
+    df = simulation(test_range=(100,500),step_size=100,runs=10, file=None)
     df

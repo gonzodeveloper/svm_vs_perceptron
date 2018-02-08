@@ -24,7 +24,7 @@ class Perceptron:
         :param x: feature vector
         :return: -1 or 1 based on return of activation
         '''
-        return 1 if np.dot(self.weights, x) + self.bias > 0 else 0
+        return 1 if np.dot(self.weights, x) + self.bias > 0 else -1
 
 
 
