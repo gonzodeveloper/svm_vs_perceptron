@@ -82,7 +82,7 @@ def simulation(test_range, step_size, file, runs=100, dim=2):
             p_error = test_error(predictions, test_labels)
 
             # Train and test with SVM
-            svm = SVMWithSGD.train(sc.parallelize(svm_train_dat), regType=None)
+            svm = SVMWithSGD.train(sc.parallelize(svm_train_dat), regType="l1")
             predictions = svm.predict(sc.parallelize(test_points))
             svm_error = test_error(predictions.collect(), svm_test_labels)
 
@@ -97,7 +97,7 @@ def simulation(test_range, step_size, file, runs=100, dim=2):
 
 
 def print_progress_bar (iteration, total, prefix = '', suffix = '', decimals = 2, length = 50, fill = '█'):
-    
+
     percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
     filledLength = int(length * iteration // total)
     bar = fill * filledLength + '-' * (length - filledLength)
@@ -115,5 +115,4 @@ if __name__ == "__main__":
     sc.setLogLevel(logLevel="OFF")
     spark = SparkSession(sparkContext=sc)
 
-
-    simulation(test_range=(5,1000),step_size=5,runs=100, file="data/run1.csv")
+    simulation(test_range=(10,50),step_size=10,runs=10, file="data/run2.csv")
