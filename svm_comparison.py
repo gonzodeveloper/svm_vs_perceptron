@@ -12,19 +12,20 @@ import pandas as pd
 def svm_labels(label):
     return 1 if label == 1 else 0
 
+
 def dist_from_hyplane(x, w, b):
     return (np.dot(w, x) + b)/np.linalg.norm(w)
 
 
 def generate_labeled_points(n, dim):
 
-    norm = np.random.uniform(low=0, high=1, size=dim)
-    intercept = np.random.uniform(low=0, high=1)
+    norm = np.random.uniform(low=-1, high=1, size=dim)
+    intercept = np.random.uniform(low=-1, high=1)
     gammas = []
 
     points = []
     for i in range(n):
-        point = np.random.uniform(low=0, high=1, size=dim)
+        point = np.random.uniform(low=-1, high=1, size=dim)
 
         dist = dist_from_hyplane(point, norm, intercept)
         # Throw out point in inside margin
@@ -46,68 +47,57 @@ def test_error(predictions, labels):
 
 
 def simulation(test_range, step_size, file, runs=100, dim=2):
-    '''
-
-    :param test_range:
-    :param step_size:
-    :param file:
-    :param runs:
-    :param dim:
-    :return:
-    '''
-    prefix = "Simulation"
-    sufix = "Complete"
 
     (low, high) = test_range
-    total = runs * ((high - low)/step_size)
-    n = low
-    data = []
-    df = pd.DataFrame()
-    while n <= high:
-        for i in range(runs):
-            points, gamma = generate_labeled_points(n, dim)
-            train_dat, test_dat = train_test_split(np.array(points), test_size=.2)
+    # For progress bar
+    prefix = "Simulation"
+    sufix = "Complete"
+    total = runs * ((high - low)/step_size) + runs
+    iteration = 0
 
+    data = []
+    for n in range(low, high+1, step_size):
+        for i in range(runs):
+            # Which iteration out of total are we on?
+            iteration += 1
+            print_progress_bar(iteration, total, prefix, sufix)
+
+            points, gamma = generate_labeled_points(n, dim)
+            # 80/20 train-test split
+            train_dat, test_dat = train_test_split(np.array(points), test_size=.2)
+            # Relabel to 1, 0 for SVM
             svm_train_dat = np.array([LabeledPoint(svm_labels(x.label),x.features) for x in train_dat])
-            print(train_dat)
-            print(svm_train_dat)
+
+            # Separate test points from their labels
             test_points = [x.features.toArray() for x in test_dat]
             test_labels = [x.label for x in test_dat]
-            svm_test_labels = [svm_labels(x.label) for x in test_dat]
-            print(test_labels)
-            print(svm_test_labels)
+            # Relabel to 1, 0 for SVM
+            svm_test_labels = np.array([svm_labels(x.label) for x in test_dat])
 
-            perceptron = Perceptron(dim)
+            # Train and test with perceptron
+            perceptron = Perceptron(dim, zeros=False)
             perceptron.train(train_dat)
             predictions = perceptron.predict(test_points)
+
             p_error = test_error(predictions, test_labels)
 
-            svm = SVMWithSGD.train(sc.parallelize(train_dat), regType=None)
+            # Train and test with SVM
+            svm = SVMWithSGD.train(sc.parallelize(svm_train_dat), regType=None)
             predictions = svm.predict(sc.parallelize(test_points))
-            svm_error = test_error(predictions.collect(), test_labels)
+            svm_error = test_error(predictions.collect(), svm_test_labels)
 
-            data.append([n, gamma, perceptron.weights, p_error, svm.weights.toArray(), svm_error])
-            print(data[i])
-        n += step_size
+            # Get magnitudes of perceptron and svm final weight vectors
+            p_len = np.linalg.norm(perceptron.weights)
+            svm_len = np.linalg.norm(svm.weights.toArray())
+            data.append([n, gamma, perceptron.weights, svm.weights.toArray(), p_error, svm_error, (svm_len/p_len)])
 
-    df = pd.DataFrame(data, columns=['n', 'gamma', 'perceptron_weights', 'perceptron_error', 'svm_weights', 'svm_error'])
-    # df.to_csv(file, sep=',', index=False)
+    df = pd.DataFrame(data, columns=['n', 'gamma', 'perceptron_weights',
+                                     'svm_weights', 'perceptron_error', 'svm_error', 'svm/percp'])
+    df.to_csv(file, sep=',', index=False)
 
-    return df
 
-
-def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 2, length = 50, fill = '█'):
-    """
-    Call in a loop to create terminal progress bar
-    @params:
-        iteration   - Required  : current iteration (Int)
-        total       - Required  : total iterations (Int)
-        prefix      - Optional  : prefix string (Str)
-        suffix      - Optional  : suffix string (Str)
-        decimals    - Optional  : positive number of decimals in percent complete (Int)
-        length      - Optional  : character length of bar (Int)
-        fill        - Optional  : bar fill character (Str)
-    """
+def print_progress_bar (iteration, total, prefix = '', suffix = '', decimals = 2, length = 50, fill = '█'):
+    
     percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
     filledLength = int(length * iteration // total)
     bar = fill * filledLength + '-' * (length - filledLength)
@@ -125,5 +115,5 @@ if __name__ == "__main__":
     sc.setLogLevel(logLevel="OFF")
     spark = SparkSession(sparkContext=sc)
 
-    df = simulation(test_range=(100,500),step_size=100,runs=10, file=None)
-    df
+
+    simulation(test_range=(5,1000),step_size=5,runs=100, file="data/run1.csv")

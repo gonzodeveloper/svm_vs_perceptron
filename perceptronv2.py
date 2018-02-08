@@ -14,8 +14,8 @@ class Perceptron:
             self.weights = np.zeros(inputs)
             self.bias = np.zeros(1)
         else:
-            self.weights = np.random.uniform(low=0, high=1, size=inputs)
-            self.bias = np.random.uniform(low=0, high=1)
+            self.weights = np.random.uniform(low=-1, high=1, size=inputs)
+            self.bias = np.random.uniform(low=-1, high=1)
 
 
     def activation(self, x):
@@ -58,10 +58,4 @@ class Perceptron:
     def predict(self, points):
         return [self.activation(x) for x in points]
 
-    def test_error(self, features, labels):
-        error_count = 0
-        for i, x in enumerate(features):
-            if self.activation(x) != labels[i]:
-                error_count += 1
-        return error_count/len(features)
 
