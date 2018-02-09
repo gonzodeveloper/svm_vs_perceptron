@@ -11,11 +11,7 @@ from multiprocessing import Pool
 class Testor:
 
     def __init__(self, low, high, step_size, runs):
-        self.low = low
-        self.high = high
         self.runs = runs
-        self.total = runs * ((high - low)/step_size) + runs
-        self.iteration = 0
 
     def dist_from_hyplane(self, x, w, b):
         '''
@@ -96,16 +92,9 @@ class Testor:
         :param dim: dimensionality of data
         :return:
         '''
-        # For progress bar
-        prefix = "Simulation"
-        sufix = "Complete"
 
         all_data = []
         for i in range(self.runs):
-            # Which iteration out of total are we on?
-            self. iteration += 1
-            self.print_progress_bar(self.iteration, self.total, prefix, sufix)
-
             # Get test data and its gamma, split 80-20 test train
             data, gamma = self.generate_labeled_points(n, dim)
             train_dat, test_dat = train_test_split(data, test_size=.2)
@@ -151,38 +140,53 @@ class Testor:
 
         return df
 
-    def print_progress_bar (self, iteration, total, prefix='', suffix='', decimals=2, length=50, fill='█'):
-        '''
-        Auxillary function. Gives us a progress bar which tracks the completion status of our task. Put in loop.
-        :param iteration: current iteration
-        :param total: total number of iterations
-        :param prefix: string
-        :param suffix: string
-        :param decimals: float point precision of % done number
-        :param length: length of bar
-        :param fill: fill of bar
-        :return:
-        '''
-        percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
-        filledLength = int(length * iteration // total)
-        bar = fill * filledLength + '-' * (length - filledLength)
-        print('\r%s |%s| %s%% %s' % (prefix, bar, percent, suffix), end = '\r')
-        # Print New Line on Complete
-        if iteration == total:
-            print()
+
+def print_progress_bar (iteration, total, prefix='', suffix='', decimals=2, length=50, fill='█'):
+    '''
+    Auxillary function. Gives us a progress bar which tracks the completion status of our task. Put in loop.
+    :param iteration: current iteration
+    :param total: total number of iterations
+    :param prefix: string
+    :param suffix: string
+    :param decimals: float point precision of % done number
+    :param length: length of bar
+    :param fill: fill of bar
+    :return:
+    '''
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filledLength = int(length * iteration // total)
+    bar = fill * filledLength + '-' * (length - filledLength)
+    print('\r%s |%s| %s%% %s' % (prefix, bar, percent, suffix), end = '\r')
+    # Print New Line on Complete
+    if iteration == total:
+        print()
 
 
 if __name__ == "__main__":
     # simulation(test_range=(100,100000),step_size=100, runs=100, file="data/run5.csv")
+    low = 100
+    high = 100001
+    step = 100
+    runs = 50
 
-    testor = Testor(low=100, high=1000, step_size=100, runs=40)
+    iteration = 0
+    total = runs * (high-low)/step + runs
+    prefix = "Simulation"
+    suffix = "Complete"
+    print_progress_bar(iteration, total, prefix=prefix, suffix=suffix)
+
+    testor = Testor(low=100, high=100000, step_size=100, runs=50)
+
     tasks = []
     for n in range(100, 100001, 100):
         tasks.append((n,))
 
     with Pool(processes=4) as pool:
         results = [pool.apply_async(testor.simulation, args=t) for t in tasks]
-        data = [r.get() for r in results]
+        for r in results:
+            iteration += runs
+            print_progress_bar(iteration, total, prefix=prefix, suffix=suffix)
+            data = r.get()
 
     df = pd.concat(data)
     df.to_csv("data/multi.csv", sep=',', index=False)
