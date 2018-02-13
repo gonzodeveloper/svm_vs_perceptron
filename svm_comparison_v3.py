@@ -1,144 +1,113 @@
-from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
-# from perceptronv3 import Perceptron
 from sklearn.linear_model.perceptron import Perceptron
+from math import ceil
 import numpy as np
 import pandas as pd
 from multiprocessing import Pool
 
 
+def dist_from_hyplane(x, w, b):
+    '''
+    Get the distance of a point x from they hyperplane defined by its intersect and normal
+    :param x: point
+    :param w: normal vector
+    :param b: intersect
+    :return: distance
+    '''
+    return (np.dot(w, x) + b) / np.linalg.norm(w)
 
-class Testor:
 
-    def __init__(self, low, high, step_size, runs):
-        self.runs = runs
+def generate_labeled_points(n_train, n_test, dim):
+    '''
+    Generate a random set of linearly seperable training and testing points in the given dimension, ensuring
+    training points
+    :param n_train: number of training points; int
+    :param n_test: number of testing points; int
+    :param dim: dimensionality of points
+    :return: np array: linearly separable train points, np array: linearly separable test points
+    '''
+    # Define a random hyperplane in space
+    norm = np.random.uniform(low=-1, high=1, size=dim)
+    intercept = 0  # np.random.uniform(low=-1, high=1)
 
-    def dist_from_hyplane(self, x, w, b):
-        '''
-        Get the distance of a point x from they hyperplane defined by its intersect and normal
-        :param x: point
-        :param w: normal vector
-        :param b: intersect
-        :return: distance
-        '''
-        return (np.dot(w, x) + b)/np.linalg.norm(w)
+    # Flags, we need to ensure that we have at least one train point with each label
+    has_neg = False
+    has_pos = False
+    i = 0
 
-    def generate_labeled_points(self, n, dim):
-        '''
-        Generate a set on n linearly separable points with a given dimensionality
-        :param n: number of points
-        :param dim: dimensionality of points
-        :return: list of points (np arrays) and their labels 1 or -1, and gamma (i.e., the margin)
-        '''
+    train = []
+    while i < n_train:
+        # Get point, its distance from hyperplane
+        point = np.random.uniform(low=-1, high=1, size=dim)
+        dist = self.dist_from_hyplane(point, norm, intercept)
+        # Determine label
+        label = 1 if dist > 0 else -1
+        train.append([point, label])
+        i += 1
 
-        # Define a random hyperplane in space
-        norm = np.random.uniform(low=-1, high=1, size=dim)
-        intercept = 0   # np.random.uniform(low=-1, high=1)
+        # Making sure that we have at least one train point with each label
+        if np.sign(dist) > 0:
+            has_pos = True
+        else:
+            has_neg = True
+        if not (has_pos and has_neg) and i == n_train:
+            i -= 1
+            train.pop()
 
-        # Flags, we need to ensure that we have at least one point with each label
-        has_neg = False
-        has_pos = False
-        i = 0
+    # Get minimum distance of any points from the plane. this is the margin
+    test = []
+    for x in range(n_test):
+        # Get point, its distance from hyperplane
+        point = np.random.uniform(low=-1, high=1, size=dim)
+        dist = self.dist_from_hyplane(point, norm, intercept)
+        # Determine label
+        label = 1 if dist > 0 else -1
+        test.append([point, label])
 
-        gammas = []
-        data = []
-        while i < n:
-            # Get point, its distance from hyperplane
-            point = np.random.uniform(low=-1, high=1, size=dim)
-            dist = self.dist_from_hyplane(point, norm, intercept)
-            gammas.append(abs(dist))
-            # Determine label
-            label = 1 if dist > 0 else -1
-            data.append([point, label])
-            i += 1
+    return train, test
 
-            # Making sure that we have at least one point of each type
-            if np.sign(dist) > 0:
-                has_pos = True
-            else:
-                has_neg = True
-            if not (has_pos and has_neg) and i == n:
-                i -= 1
-                data.pop()
-        # Get minimum distance of any points from the plane. this is the margin
-        gamma = min(gammas)
-        return data, gamma
 
-    def test_error(self, predictions, labels):
-        '''
-        Figure out float valued test error from a list of predictions and labels
-        :param predictions: list of predicted classifications
-        :param labels: list of actual labels
-        :return: flaot valued error 0-1
-        '''
-        error_count = 0
-        total = len(predictions)
-        for x, y in zip(predictions, labels):
-            if x != y:
-                error_count += 1
-        return error_count/total
+def simulation(self, n, p_runs, runs = 100, d=2):
+    '''
+    Run a a given number of simulations to compare svm and perceptron error rates. Generates a set of training and testing points, runs a
+    single svm and a given number of perceptrons (avg error is taken)
+    :param n: number of points
+    :param p_runs: number of perceptrons to average
+    :param d: dimensionality of points
+    :return: pandas dataframe, each row
+    '''
 
-    def simulation(self, n, dim=2):
-        '''
-        Run a simulation to test svm and perceptron on a given amount of points. Each run of the simulation generates a set
-        of data then trains a perceptron and a svm with a given slice and tests both of their predictions' for accuracy.
-        A csv is written where each row represents a run. The row contains data on the number of points, margin of data,
-        perceptron weights, svm weighs, perceptron prediction error, svm prediction error, and ratio of svm/perceptron weight
-        megnitudes for that run,
-        :param test_range: range of n to test on
-        :param step_size: step size to increment n
-        :param file: file name for write
-        :param runs: number of runs per n step
-        :param dim: dimensionality of data
-        :return:
-        '''
+    all_data = []
+    for i in range(self.runs):
+        # Get test data and its gamma, split 80-20 test train
+        train_dat, test_dat = self.generate_labeled_points(n_train=n, n_test=ceil(n * 25), dim=d)
 
-        all_data = []
-        for i in range(self.runs):
-            # Get test data and its gamma, split 80-20 test train
-            data, gamma = self.generate_labeled_points(n, dim)
-            train_dat, test_dat = train_test_split(data, test_size=.2)
+        # Separate train points from labels
+        train_points = [x[0] for x in train_dat]
+        train_labels = [x[1] for x in train_dat]
 
-            # Separate train points from labels
-            train_points = [x[0] for x in train_dat]
-            train_labels = [x[1] for x in train_dat]
+        # Separate test points from their labels
+        test_points = [x[0] for x in test_dat]
+        test_labels = [x[1] for x in test_dat]
 
-            # Separate test points from their labels
-            test_points = [x[0] for x in test_dat]
-            test_labels = [x[1] for x in test_dat]
-
-            # Train and test with perceptron
-            perceptron = Perceptron()
+        # Run k = p_runs number of perceptrons on this same training data, take their mean error
+        p_errors = []
+        seed = np.random.RandomState()
+        for k in range(p_runs):
+            perceptron = Perceptron(random_state=seed)
             perceptron.fit(train_points, train_labels)
-            predictions = perceptron.predict(test_points)
-            p_error = self.test_error(predictions, test_labels)
+            p_errors.append(perceptron.score(test_points, test_labels))
+        p_error = np.mean(p_errors)
 
-            dist = []
-            for x in train_points:
-                dist.append(abs(self.dist_from_hyplane(x, perceptron.coef_, perceptron.intercept_)))
-            p_gamma = float(min(dist))
+        # Train and test with single SVM
+        svm = SVC(kernel="linear")
+        svm.fit(train_points, train_labels)
+        svm_error = svm.score(test_points, test_labels)
 
-            # Train and test with SVM
-            svm = SVC(kernel="linear")
-            # Throw out the rare case where our train is all same class
-            try:
-                svm.fit(train_points, train_labels)
-            except ValueError:
-                continue
-            predictions = svm.predict(test_points)
-            svm_error = self.test_error(predictions, test_labels)
+        all_data.append([n, p_error, svm_error])
 
-            dist = []
-            for x in train_points:
-                dist.append(abs(self.dist_from_hyplane(x, svm.coef_, svm.intercept_)))
-            s_gamma = float(min(dist))
-
-            all_data.append([n, gamma, p_gamma, s_gamma,  p_error, svm_error])
-
-        df = pd.DataFrame(all_data, columns=['n', 'gamma', 'perceptron gamma', 'svm gamma',
-                                       'perceptron_error', 'svm_error'])
-
-        return df
+    df = pd.DataFrame(all_data, columns=['n', 'avg perceptron_error', 'svm_error'])
+    return df
 
 
 def print_progress_bar (iteration, total, prefix='', suffix='', decimals=2, length=50, fill='█'):
@@ -163,30 +132,35 @@ def print_progress_bar (iteration, total, prefix='', suffix='', decimals=2, leng
 
 
 if __name__ == "__main__":
-    # simulation(test_range=(100,100000),step_size=100, runs=100, file="data/run5.csv")
-    low = 100
-    high = 100001
-    step = 100
-    runs = 50
 
+    # Increase n by exponents of 2: start at n=2**1, end at n=2**16=65,536
+    # For each n we run simulation on 100 randomly generated sets of points
+    lo = 1
+    hi = 16
+    run = 100
+
+    # Progress bar stuff
     iteration = 0
-    total = runs * (high-low)/step + runs
+    total = run * (hi-lo) + run
     prefix = "Simulation"
     suffix = "Complete"
     print_progress_bar(iteration, total, prefix=prefix, suffix=suffix)
 
-    testor = Testor(low=100, high=100000, step_size=100, runs=50)
-
+    # Each task is single simulation with given n size and 100 perceptron runs per dataset
     tasks = []
-    for n in range(100, 100001, 100):
-        tasks.append((n,))
+    for n in range(lo, hi+1):
+        tasks.append((2**n, 100, ))
 
-    with Pool(processes=4) as pool:
-        results = [pool.apply_async(testor.simulation, args=t) for t in tasks]
+    # Send our tasks to the process pool, as they complete append their results to data
+    data = []
+    with Pool(processes=3) as pool:
+        results = [pool.apply_async(simulation, args=t) for t in tasks]
         for r in results:
-            iteration += runs
+            iteration += run
+            data.append(r.get())
             print_progress_bar(iteration, total, prefix=prefix, suffix=suffix)
-            data = r.get()
 
+    print("Writing data...")
     df = pd.concat(data)
-    df.to_csv("data/multi.csv", sep=',', index=False)
+    df.to_csv("data/small.csv", sep=',', index=False)
+
