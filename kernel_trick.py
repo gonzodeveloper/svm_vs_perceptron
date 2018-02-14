@@ -42,6 +42,15 @@ if __name__ == "__main__":
     # Transform points into higher dimensional space with polynomial kernel
     kernel_points = poly_kernel(points, labels, exp=2, dim=2)
 
+    # Equation y = mx + b with random m and b
+    x_coef = np.random.uniform(low=-1, high = 1)
+    b = np.random.uniform(low=-1, high=1)
+
+    for i, v in enumerate(points):
+        labels[i] = 1 if v[1] > (x_coef * v[0] + b) else -1
+
+    kernel_points = poly_kernel(points, labels, exp=3, dim=2)
+
     # Run linear svm on transformed points for separation
     svm = SVC(kernel="linear")
     svm.fit(kernel_points, labels)
