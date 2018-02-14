@@ -42,6 +42,8 @@ if __name__ == "__main__":
     # Transform points into higher dimensional space with polynomial kernel
     kernel_points = poly_kernel(points, labels, exp=2, dim=2)
 
+
+    # TEST FOR CUBIC KERNEL
     # Equation y = mx + b with random m and b
     x_coef = np.random.uniform(low=-1, high = 1)
     b = np.random.uniform(low=-1, high=1)
