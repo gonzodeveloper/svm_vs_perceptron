@@ -27,11 +27,11 @@ def poly_kernel(points, labels, exp, dim):
 
 if __name__ == "__main__":
 
-    usage = "python3 kernel_trick.py [qudratic|cubic]"
-    if len(sys.argv) != 3:
+    usage = "python3 kernel_trick.py [quadratic|cubic]"
+    if len(sys.argv) != 2 or (sys.argv[1] != 'cubic' and sys.argv[1] != 'quadratic'):
         print(usage)
         exit(1)
-    exponent = sys.argv[2]
+    exponent = sys.argv[1]
 
     # Get 200, 2 dimensional points
     dim = 2
