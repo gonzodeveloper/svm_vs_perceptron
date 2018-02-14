@@ -3,6 +3,7 @@ from scipy.spatial.distance import euclidean
 from sklearn.svm import SVC
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import sys
 
 
 def poly_kernel(points, labels, exp, dim):
@@ -26,32 +27,42 @@ def poly_kernel(points, labels, exp, dim):
 
 if __name__ == "__main__":
 
-    # Creating a set of 2-d data seperable by a random circle
-    n = 200
-    radius = 0.5
-    dim = 2
+    usage = "python3 kernel_trick.py [qudratic|cubic]"
+    if len(sys.argv) != 3:
+        print(usage)
+        exit(1)
+    exponent = sys.argv[2]
 
-    center = np.random.uniform(low=-1, high=1, size=dim)
+    # Get 200, 2 dimensional points
+    dim = 2
+    n = 200
+
     points = np.random.uniform(low=-1, high=1, size=(n, dim))
     labels = np.empty(n)
 
-    # Generate labels according to points' position inside or outside of circle
-    for i, v in enumerate(points):
-        labels[i] = 1 if euclidean(v, center) > radius else -1
+    if exponent == 'quadratic':
+        # Creating a set of 2-d data seperable by a random circle
+        radius = 0.5
+        center = np.random.uniform(low=-1, high=1, size=dim)
 
-    # Transform points into higher dimensional space with polynomial kernel
-    kernel_points = poly_kernel(points, labels, exp=2, dim=2)
+        # Generate labels according to points' position inside or outside of circle
+        for i, v in enumerate(points):
+            labels[i] = 1 if euclidean(v, center) > radius else -1
 
+        # Transform points into higher dimensional space with quadratic polynomial kernel
+        kernel_points = poly_kernel(points, labels, exp=2, dim=2)
 
-    # TEST FOR CUBIC KERNEL
-    # Equation y = mx + b with random m and b
-    x_coef = np.random.uniform(low=-1, high = 1)
-    b = np.random.uniform(low=-1, high=1)
+    if exponent == 'cubic':
+        # Equation y = mx + b with random m and b
+        x_coef = np.random.uniform(low=-1, high = 1)
+        b = np.random.uniform(low=-1, high=1)
 
-    for i, v in enumerate(points):
-        labels[i] = 1 if v[1] > (x_coef * v[0] + b) else -1
+        # Generate labels accodring to points' position on either side of cubic curve
+        for i, v in enumerate(points):
+            labels[i] = 1 if v[1] > (x_coef * v[0] + b) else -1
 
-    kernel_points = poly_kernel(points, labels, exp=3, dim=2)
+        # Transform points into higher dimensional space with cubic polynomial kernel
+        kernel_points = poly_kernel(points, labels, exp=3, dim=2)
 
     # Run linear svm on transformed points for separation
     svm = SVC(kernel="linear")
