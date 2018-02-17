@@ -17,7 +17,7 @@ def dist_from_hyplane(x, w, b):
     return (np.dot(w, x) + b) / np.linalg.norm(w)
 
 
-def generate_labeled_points(n_train, n_test, dim):
+def generate_labeled_points(n_train, n_test, dim, gamma=0):
     '''
     Generate a random set of linearly seperable training and testing points in the given dimension, ensuring
     training points
@@ -36,51 +36,60 @@ def generate_labeled_points(n_train, n_test, dim):
     i = 0
 
     train = []
+    gammas = []
     while i < n_train:
-        # Get point, its distance from hyperplane
+        # Get point, label and its distance from hyperplane
         point = np.random.uniform(low=-1, high=1, size=dim)
-        dist = self.dist_from_hyplane(point, norm, intercept)
-        # Determine label
+        dist = dist_from_hyplane(point, norm, intercept)
         label = 1 if dist > 0 else -1
-        train.append([point, label])
-        i += 1
 
-        # Making sure that we have at least one train point with each label
+        # Update flags to show that we have pos or neg point
         if np.sign(dist) > 0:
             has_pos = True
         else:
             has_neg = True
+
+        # If we get to the end and we do not have one of each point, try again
         if not (has_pos and has_neg) and i == n_train:
-            i -= 1
-            train.pop()
+            continue
+        # If point violates gamma, try again
+        if abs(dist) < gamma:
+            continue
+
+        train.append([point, label])
+        gammas.append(abs(dist))
+        i += 1
 
     # Get minimum distance of any points from the plane. this is the margin
+    margin = min(gammas)
+
     test = []
     for x in range(n_test):
         # Get point, its distance from hyperplane
         point = np.random.uniform(low=-1, high=1, size=dim)
-        dist = self.dist_from_hyplane(point, norm, intercept)
+        dist = dist_from_hyplane(point, norm, intercept)
         # Determine label
         label = 1 if dist > 0 else -1
         test.append([point, label])
 
-    return train, test
+    return train, test, margin
 
 
-def simulation(self, n, p_runs, runs = 100, d=2):
+def simulation(n, runs, margin=0, p_runs=100, d=2):
     '''
     Run a a given number of simulations to compare svm and perceptron error rates. Generates a set of training and testing points, runs a
     single svm and a given number of perceptrons (avg error is taken)
     :param n: number of points
     :param p_runs: number of perceptrons to average
+    :param runs: number of times to sun simulation
     :param d: dimensionality of points
     :return: pandas dataframe, each row
     '''
 
     all_data = []
-    for i in range(self.runs):
+    for i in range(runs):
         # Get test data and its gamma, split 80-20 test train
-        train_dat, test_dat = self.generate_labeled_points(n_train=n, n_test=ceil(n * 25), dim=d)
+        train_dat, test_dat, margin = generate_labeled_points(n_train=n, n_test=ceil(n * 25), gamma=margin, dim=d)
 
         # Separate train points from labels
         train_points = [x[0] for x in train_dat]
@@ -104,9 +113,9 @@ def simulation(self, n, p_runs, runs = 100, d=2):
         svm.fit(train_points, train_labels)
         svm_error = svm.score(test_points, test_labels)
 
-        all_data.append([n, p_error, svm_error])
+        all_data.append([n, margin, p_error, svm_error])
 
-    df = pd.DataFrame(all_data, columns=['n', 'avg perceptron_error', 'svm_error'])
+    df = pd.DataFrame(all_data, columns=['n', 'margin', 'avg perceptron_error', 'svm_error'])
     return df
 
 
@@ -133,23 +142,32 @@ def print_progress_bar (iteration, total, prefix='', suffix='', decimals=2, leng
 
 if __name__ == "__main__":
 
+    '''
     # Increase n by exponents of 2: start at n=2**1, end at n=2**16=65,536
     # For each n we run simulation on 100 randomly generated sets of points
     lo = 1
     hi = 16
     run = 100
+    '''
+
+    # Fix n to 100 points
+    n = 100
+    run = 100
+    # Vary gamma from 0.1 - 1
+    lo = 0.01
+    hi = 1
 
     # Progress bar stuff
     iteration = 0
-    total = run * (hi-lo) + run
+    total = 50 * 100
     prefix = "Simulation"
     suffix = "Complete"
     print_progress_bar(iteration, total, prefix=prefix, suffix=suffix)
 
-    # Each task is single simulation with given n size and 100 perceptron runs per dataset
+
     tasks = []
-    for n in range(lo, hi+1):
-        tasks.append((2**n, 100, ))
+    for g in map(lambda x: x/100.0, range(1, 100, 1)):
+        tasks.append((n, run, g, ))
 
     # Send our tasks to the process pool, as they complete append their results to data
     data = []

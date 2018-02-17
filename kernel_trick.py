@@ -28,7 +28,7 @@ def poly_kernel(points, labels, exp, dim):
 if __name__ == "__main__":
 
     usage = "python3 kernel_trick.py [quadratic|cubic]"
-    if len(sys.argv) != 2 or (sys.argv[1] != 'cubic' and sys.argv[1] != 'quadratic'):
+    if len(sys.argv) != 2 or (sys.argv[1] not in ['cubic','quadratic','test']):
         print(usage)
         exit(1)
     exponent = sys.argv[1]
@@ -63,6 +63,7 @@ if __name__ == "__main__":
 
         # Transform points into higher dimensional space with cubic polynomial kernel
         kernel_points = poly_kernel(points, labels, exp=3, dim=2)
+
 
     # Run linear svm on transformed points for separation
     svm = SVC(kernel="linear")
